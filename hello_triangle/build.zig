@@ -34,13 +34,6 @@ pub fn build(b: *std.Build) void {
     const zopengl = b.dependency("zopengl", .{});
     exe.root_module.addImport("zopengl", zopengl.module("root"));
 
-    const zgui = b.dependency("zgui", .{
-        .shared = false,
-        .with_implot = true,
-    });
-    exe.root_module.addImport("zgui", zgui.module("root"));
-    exe.linkLibrary(zgui.artifact("imgui"));
-
     const zpool = b.dependency("zpool", .{});
     exe.root_module.addImport("zpool", zpool.module("root"));
 
