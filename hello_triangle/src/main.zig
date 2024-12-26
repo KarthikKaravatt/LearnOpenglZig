@@ -4,6 +4,7 @@ const builtin = @import("builtin");
 const glfw = @import("zglfw");
 const zopengl = @import("zopengl");
 
+/// Change the viewport size when window is resized
 fn frameBufferSizeCallback(
     _: *glfw.Window,
     width: i32,
@@ -12,6 +13,7 @@ fn frameBufferSizeCallback(
     zopengl.bindings.viewport(0, 0, width, height);
 }
 
+/// Process the input
 fn processInput(window: *glfw.Window) void {
     if (glfw.Window.getKey(window, glfw.Key.escape) == glfw.Action.press) {
         glfw.Window.setShouldClose(window, true);
@@ -21,24 +23,10 @@ fn processInput(window: *glfw.Window) void {
 pub fn main() !void {
     const window_width = 800;
     const window_height = 600;
-    const gl_major = 3;
-    const gl_minor = 3;
-    const vertexShaderSource = &[_][*:0]const u8{
-        "#version 330 core\n",
-        "layout (location = 0) in vec3 aPos;\n",
-        "void main()\n",
-        "{\n",
-        "gl_Position = vec4(aPos.x,aPos.y,aPos.z,1.0);\n",
-        "}",
-    };
-    const fragmentShaderSource = &[_][*:0]const u8{
-        "#version 330 core\n",
-        "out vec4 FragColor;\n",
-        "void main()\n",
-        "{\n",
-        "FragColor = vec4(0.1f,0.5f,0.2f,1.0f);\n",
-        "}",
-    };
+    const gl_major = 4;
+    const gl_minor = 0;
+
+    //GLFW initialisation
     try glfw.init();
     glfw.windowHintTyped(.context_version_major, gl_major);
     glfw.windowHintTyped(.context_version_minor, gl_minor);
@@ -55,91 +43,180 @@ pub fn main() !void {
         null,
     );
     glfw.makeContextCurrent(window);
-    try zopengl.loadCoreProfile(glfw.getProcAddress, gl_major, gl_minor);
-    const gl = zopengl.bindings;
     _ = window.setFramebufferSizeCallback(frameBufferSizeCallback);
 
-    const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+    // Load function pointers for opengl
+    try zopengl.loadCoreProfile(glfw.getProcAddress, gl_major, gl_minor);
+    const gl = zopengl.bindings;
 
-    gl.shaderSource(vertexShader, 1, vertexShaderSource, null);
-    gl.compileShader(vertexShader);
-
-    var success: i32 = 0;
-    var infoLog: [512]u8 = [_]u8{0} ** 512;
-    gl.getShaderiv(vertexShader, gl.COMPILE_STATUS, &success);
-    if (success == 0) {
-        std.debug.print("Shader has not compiled\n", .{});
-        gl.getShaderInfoLog(vertexShader, 512, 0, &infoLog);
-        std.debug.print("{s}", .{infoLog});
-    }
-
-    const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-    gl.shaderSource(fragmentShader, 1, fragmentShaderSource, null);
-    gl.compileShader(fragmentShader);
-
-    gl.getShaderiv(fragmentShader, gl.COMPILE_STATUS, &success);
-    if (success == 0) {
-        gl.getShaderInfoLog(fragmentShader, 512, 0, &infoLog);
-        std.debug.print("{s}", .{infoLog});
-    }
-
-    const shaderProgram = gl.createProgram();
-
-    gl.attachShader(shaderProgram, vertexShader);
-    gl.attachShader(shaderProgram, fragmentShader);
-    gl.linkProgram(shaderProgram);
-
-    gl.getProgramiv(shaderProgram, gl.LINK_STATUS, &success);
-    if (success == 0) {
-        gl.getProgramInfoLog(shaderProgram, 512, 0, &infoLog);
-        std.debug.print("{s}\n", .{infoLog});
-    }
-    gl.deleteShader(vertexShader);
-    gl.deleteShader(fragmentShader);
-
-    const vertices = [_]f32{
-        -0.5, -0.5, 0,
-        0.5,  -0.5, 0,
-        0.0,  0.5,  0,
+    // Triangle with 3 points
+    var vertices: [9]gl.Float = [9]gl.Float{
+        -0.7, -0.5, 0.0,
+        0.7,  -0.5, 0.0,
+        0.0,  0.7,  0.0,
     };
-    var VBO: c_uint = undefined;
-    var VAO: c_uint = undefined;
 
+    // Setup vertex array object and vertex buffer object
+    var VAO: gl.Uint = undefined;
     gl.genVertexArrays(1, &VAO);
-
-    gl.genBuffers(1, &VBO);
-
     gl.bindVertexArray(VAO);
-
+    var VBO: gl.Uint = undefined;
+    gl.genBuffers(1, &VBO);
     gl.bindBuffer(gl.ARRAY_BUFFER, VBO);
     gl.bufferData(
         gl.ARRAY_BUFFER,
-        @sizeOf(@TypeOf(f32)) * vertices.len,
+        vertices.len * @sizeOf(gl.Float),
         &vertices,
         gl.STATIC_DRAW,
     );
-
-    gl.vertexAttribPointer(0, 3, gl.FLOAT, gl.FALSE, 3 * @sizeOf(f32), null);
+    gl.vertexAttribPointer(
+        0,
+        3,
+        gl.FLOAT,
+        gl.FALSE,
+        3 * @sizeOf(gl.Float),
+        null,
+    );
     gl.enableVertexAttribArray(0);
+    var e = gl.getError();
+    if (e != gl.NO_ERROR) {
+        std.debug.print("error: {d}\n", .{e});
+        return;
+    }
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, 0);
-    gl.bindVertexArray(0);
+    // Compile vertex shader
+    const vertexShaderSource: [:0]const u8 = @embedFile("shaders/triangle.vs");
+    std.debug.print("vertexShaderSource: {s}\n", .{vertexShaderSource.ptr});
+    const vertexShader: gl.Uint = gl.createShader(gl.VERTEX_SHADER);
+    defer gl.deleteShader(vertexShader);
+    gl.shaderSource(
+        vertexShader,
+        1,
+        &[_][*c]const u8{vertexShaderSource.ptr},
+        null,
+    );
+    gl.compileShader(vertexShader);
+    var success: gl.Int = 0;
+    gl.getShaderiv(vertexShader, gl.COMPILE_STATUS, &success);
+    if (success == 0) {
+        var infoLog: [512]u8 = undefined;
+        var logSize: gl.Int = 0;
+        gl.getShaderInfoLog(vertexShader, 512, &logSize, &infoLog);
+        const i: usize = @intCast(logSize);
+        std.debug.print(
+            "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n{s}\n",
+            .{infoLog[0..i]},
+        );
+        return;
+    } else {
+        var infoLog: [512]u8 = undefined;
+        var logSize: gl.Int = 0;
+        gl.getShaderInfoLog(vertexShader, 512, &logSize, &infoLog);
+        const i: usize = @intCast(logSize);
+        std.debug.print(
+            "INFO::SHADER::VERTEX::LINKING_SUCCESS\n{s}\n",
+            .{infoLog[0..i]},
+        );
+    }
+
+    // Compile fragment shader
+    const fragmentShaderSource: [:0]const u8 =
+        @embedFile("shaders/triangle.fs");
+    std.debug.print(
+        "fragmentShaderSource: {s}\n",
+        .{fragmentShaderSource.ptr},
+    );
+    const fragmentShader: gl.Uint = gl.createShader(gl.FRAGMENT_SHADER);
+    defer gl.deleteShader(fragmentShader);
+    gl.shaderSource(
+        fragmentShader,
+        1,
+        &[_][*c]const u8{fragmentShaderSource.ptr},
+        null,
+    );
+    gl.compileShader(fragmentShader);
+    gl.getShaderiv(fragmentShader, gl.COMPILE_STATUS, &success);
+    if (success == 0) {
+        var infoLog: [512]u8 = undefined;
+        var logSize: gl.Int = 0;
+        gl.getShaderInfoLog(fragmentShader, 512, &logSize, &infoLog);
+        const i: usize = @intCast(logSize);
+        std.debug.print(
+            "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n{s}\n",
+            .{infoLog[0..i]},
+        );
+        return;
+    } else {
+        var infoLog: [512]u8 = undefined;
+        var logSize: gl.Int = 0;
+        gl.getShaderInfoLog(vertexShader, 512, &logSize, &infoLog);
+        const i: usize = @intCast(logSize);
+        std.debug.print(
+            "INFO::SHADER::FRAGMENT::LINKING_SUCCESS\n{s}\n",
+            .{infoLog[0..i]},
+        );
+    }
+
+    // Create shader program
+    const shaderProgram: gl.Uint = gl.createProgram();
+    gl.attachShader(shaderProgram, vertexShader);
+    gl.attachShader(shaderProgram, fragmentShader);
+    e = gl.getError();
+    if (e != gl.NO_ERROR) {
+        std.debug.print("error: {d}\n", .{e});
+        return;
+    }
+    gl.linkProgram(shaderProgram);
+    gl.getProgramiv(shaderProgram, gl.LINK_STATUS, &success);
+    if (success == 0) {
+        var infoLog: [512]u8 = undefined;
+        var logSize: gl.Int = 0;
+        gl.getProgramInfoLog(shaderProgram, 512, &logSize, &infoLog);
+        const i: usize = @intCast(logSize);
+        std.debug.print("ERROR::SHADER::PROGRAM::LINKING_FAILED\n{s}\n", .{infoLog[0..i]});
+        return;
+    } else {
+        var infoLog: [512]u8 = undefined;
+        var logSize: gl.Int = 0;
+        gl.getProgramInfoLog(shaderProgram, 512, &logSize, &infoLog);
+        const i: usize = @intCast(logSize);
+        std.debug.print("INFO::SHADER::PROGRAM::LINKING_SUCCESS {d}\n{s}\n", .{ i, infoLog[0..i] });
+    }
+    e = gl.getError();
+    if (e != gl.NO_ERROR) {
+        std.debug.print("error: {d}\n", .{e});
+        return;
+    }
+    std.debug.print("program set up \n", .{});
 
     while (!glfw.Window.shouldClose(window)) {
         processInput(window);
         gl.clearColor(0.2, 0.3, 0.3, 1.0);
         gl.clear(gl.COLOR_BUFFER_BIT);
 
+        // Draw the triangle
         gl.useProgram(shaderProgram);
+        e = gl.getError();
+        if (e != gl.NO_ERROR) {
+            std.debug.print("error: {d}\n", .{e});
+            return;
+        }
         gl.bindVertexArray(VAO);
+        e = gl.getError();
+        if (e != gl.NO_ERROR) {
+            std.debug.print("error: {d}\n", .{e});
+            return;
+        }
         gl.drawArrays(gl.TRIANGLES, 0, 3);
+        e = gl.getError();
+        if (e != gl.NO_ERROR) {
+            std.debug.print("error: {d}\n", .{e});
+            return;
+        }
 
         window.swapBuffers();
         glfw.pollEvents();
     }
-    gl.deleteVertexArrays(1, &VAO);
-    gl.deleteBuffers(1, &VBO);
-    gl.deleteProgram(shaderProgram);
 
     glfw.terminate();
 }
