@@ -19,6 +19,15 @@ fn processInput(window: *glfw.Window) void {
         glfw.Window.setShouldClose(window, true);
     }
 }
+fn hasGlError() bool {
+    const gl = zopengl.bindings;
+    const e = gl.getError();
+    if (e != gl.NO_ERROR) {
+        std.debug.print("OpenGL Error: {d}\n", .{e});
+        return true;
+    }
+    return false;
+}
 
 pub fn main() !void {
     const window_width = 800;
@@ -78,15 +87,19 @@ pub fn main() !void {
         null,
     );
     gl.enableVertexAttribArray(0);
-    var e = gl.getError();
-    if (e != gl.NO_ERROR) {
-        std.debug.print("error: {d}\n", .{e});
-        return;
+    gl.enableVertexAttribArray(0);
+    if (builtin.mode == .Debug) {
+        std.debug.print("DEBUG\n", .{});
+        if (hasGlError()) return;
     }
 
     // Compile vertex shader
     const vertexShaderSource: [:0]const u8 = @embedFile("shaders/triangle.vs");
-    std.debug.print("vertexShaderSource: {s}\n", .{vertexShaderSource.ptr});
+    if (builtin.mode == .Debug)
+        std.debug.print(
+            "vertexShaderSource: {s}\n",
+            .{vertexShaderSource.ptr},
+        );
     const vertexShader: gl.Uint = gl.createShader(gl.VERTEX_SHADER);
     defer gl.deleteShader(vertexShader);
     gl.shaderSource(
@@ -96,36 +109,39 @@ pub fn main() !void {
         null,
     );
     gl.compileShader(vertexShader);
-    var success: gl.Int = 0;
-    gl.getShaderiv(vertexShader, gl.COMPILE_STATUS, &success);
-    if (success == 0) {
-        var infoLog: [512]u8 = undefined;
-        var logSize: gl.Int = 0;
-        gl.getShaderInfoLog(vertexShader, 512, &logSize, &infoLog);
-        const i: usize = @intCast(logSize);
-        std.debug.print(
-            "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n{s}\n",
-            .{infoLog[0..i]},
-        );
-        return;
-    } else {
-        var infoLog: [512]u8 = undefined;
-        var logSize: gl.Int = 0;
-        gl.getShaderInfoLog(vertexShader, 512, &logSize, &infoLog);
-        const i: usize = @intCast(logSize);
-        std.debug.print(
-            "INFO::SHADER::VERTEX::LINKING_SUCCESS\n{s}\n",
-            .{infoLog[0..i]},
-        );
+    if (builtin.mode == .Debug) {
+        var success: gl.Int = 0;
+        gl.getShaderiv(vertexShader, gl.COMPILE_STATUS, &success);
+        if (success == 0) {
+            var infoLog: [512]u8 = undefined;
+            var logSize: gl.Int = 0;
+            gl.getShaderInfoLog(vertexShader, 512, &logSize, &infoLog);
+            const i: usize = @intCast(logSize);
+            std.debug.print(
+                "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n{s}\n",
+                .{infoLog[0..i]},
+            );
+            return;
+        } else {
+            var infoLog: [512]u8 = undefined;
+            var logSize: gl.Int = 0;
+            gl.getShaderInfoLog(vertexShader, 512, &logSize, &infoLog);
+            const i: usize = @intCast(logSize);
+            std.debug.print(
+                "INFO::SHADER::VERTEX::LINKING_SUCCESS\n{s}\n",
+                .{infoLog[0..i]},
+            );
+        }
     }
 
     // Compile fragment shader
     const fragmentShaderSource: [:0]const u8 =
         @embedFile("shaders/triangle.fs");
-    std.debug.print(
-        "fragmentShaderSource: {s}\n",
-        .{fragmentShaderSource.ptr},
-    );
+    if (builtin.mode == .Debug)
+        std.debug.print(
+            "fragmentShaderSource: {s}\n",
+            .{fragmentShaderSource.ptr},
+        );
     const fragmentShader: gl.Uint = gl.createShader(gl.FRAGMENT_SHADER);
     defer gl.deleteShader(fragmentShader);
     gl.shaderSource(
@@ -135,59 +151,58 @@ pub fn main() !void {
         null,
     );
     gl.compileShader(fragmentShader);
-    gl.getShaderiv(fragmentShader, gl.COMPILE_STATUS, &success);
-    if (success == 0) {
-        var infoLog: [512]u8 = undefined;
-        var logSize: gl.Int = 0;
-        gl.getShaderInfoLog(fragmentShader, 512, &logSize, &infoLog);
-        const i: usize = @intCast(logSize);
-        std.debug.print(
-            "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n{s}\n",
-            .{infoLog[0..i]},
-        );
-        return;
-    } else {
-        var infoLog: [512]u8 = undefined;
-        var logSize: gl.Int = 0;
-        gl.getShaderInfoLog(vertexShader, 512, &logSize, &infoLog);
-        const i: usize = @intCast(logSize);
-        std.debug.print(
-            "INFO::SHADER::FRAGMENT::LINKING_SUCCESS\n{s}\n",
-            .{infoLog[0..i]},
-        );
+    if (builtin.mode == .Debug) {
+        var success: gl.Int = 0;
+        gl.getShaderiv(fragmentShader, gl.COMPILE_STATUS, &success);
+        if (success == 0) {
+            var infoLog: [512]u8 = undefined;
+            var logSize: gl.Int = 0;
+            gl.getShaderInfoLog(fragmentShader, 512, &logSize, &infoLog);
+            const i: usize = @intCast(logSize);
+            std.debug.print(
+                "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n{s}\n",
+                .{infoLog[0..i]},
+            );
+            return;
+        } else {
+            var infoLog: [512]u8 = undefined;
+            var logSize: gl.Int = 0;
+            gl.getShaderInfoLog(vertexShader, 512, &logSize, &infoLog);
+            const i: usize = @intCast(logSize);
+            std.debug.print(
+                "INFO::SHADER::FRAGMENT::LINKING_SUCCESS\n{s}\n",
+                .{infoLog[0..i]},
+            );
+        }
     }
 
     // Create shader program
     const shaderProgram: gl.Uint = gl.createProgram();
     gl.attachShader(shaderProgram, vertexShader);
     gl.attachShader(shaderProgram, fragmentShader);
-    e = gl.getError();
-    if (e != gl.NO_ERROR) {
-        std.debug.print("error: {d}\n", .{e});
-        return;
-    }
+    if (builtin.mode == .Debug)
+        if (hasGlError()) return;
     gl.linkProgram(shaderProgram);
-    gl.getProgramiv(shaderProgram, gl.LINK_STATUS, &success);
-    if (success == 0) {
-        var infoLog: [512]u8 = undefined;
-        var logSize: gl.Int = 0;
-        gl.getProgramInfoLog(shaderProgram, 512, &logSize, &infoLog);
-        const i: usize = @intCast(logSize);
-        std.debug.print("ERROR::SHADER::PROGRAM::LINKING_FAILED\n{s}\n", .{infoLog[0..i]});
-        return;
-    } else {
-        var infoLog: [512]u8 = undefined;
-        var logSize: gl.Int = 0;
-        gl.getProgramInfoLog(shaderProgram, 512, &logSize, &infoLog);
-        const i: usize = @intCast(logSize);
-        std.debug.print("INFO::SHADER::PROGRAM::LINKING_SUCCESS {d}\n{s}\n", .{ i, infoLog[0..i] });
+    if (builtin.mode == .Debug) {
+        var success: gl.Int = 0;
+        gl.getProgramiv(shaderProgram, gl.LINK_STATUS, &success);
+        if (success == 0) {
+            var infoLog: [512]u8 = undefined;
+            var logSize: gl.Int = 0;
+            gl.getProgramInfoLog(shaderProgram, 512, &logSize, &infoLog);
+            const i: usize = @intCast(logSize);
+            std.debug.print("ERROR::SHADER::PROGRAM::LINKING_FAILED\n{s}\n", .{infoLog[0..i]});
+            return;
+        } else {
+            var infoLog: [512]u8 = undefined;
+            var logSize: gl.Int = 0;
+            gl.getProgramInfoLog(shaderProgram, 512, &logSize, &infoLog);
+            const i: usize = @intCast(logSize);
+            std.debug.print("INFO::SHADER::PROGRAM::LINKING_SUCCESS {d}\n{s}\n", .{ i, infoLog[0..i] });
+        }
     }
-    e = gl.getError();
-    if (e != gl.NO_ERROR) {
-        std.debug.print("error: {d}\n", .{e});
-        return;
-    }
-    std.debug.print("program set up \n", .{});
+    if (builtin.mode == .Debug)
+        if (hasGlError()) return;
 
     while (!glfw.Window.shouldClose(window)) {
         processInput(window);
@@ -196,23 +211,14 @@ pub fn main() !void {
 
         // Draw the triangle
         gl.useProgram(shaderProgram);
-        e = gl.getError();
-        if (e != gl.NO_ERROR) {
-            std.debug.print("error: {d}\n", .{e});
-            return;
-        }
+        if (builtin.mode == .Debug)
+            if (hasGlError()) return;
         gl.bindVertexArray(VAO);
-        e = gl.getError();
-        if (e != gl.NO_ERROR) {
-            std.debug.print("error: {d}\n", .{e});
-            return;
-        }
+        if (builtin.mode == .Debug)
+            if (hasGlError()) return;
         gl.drawArrays(gl.TRIANGLES, 0, 3);
-        e = gl.getError();
-        if (e != gl.NO_ERROR) {
-            std.debug.print("error: {d}\n", .{e});
-            return;
-        }
+        if (builtin.mode == .Debug)
+            if (hasGlError()) return;
 
         window.swapBuffers();
         glfw.pollEvents();
