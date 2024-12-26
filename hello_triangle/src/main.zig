@@ -37,6 +37,7 @@ pub fn main() !void {
 
     //GLFW initialisation
     try glfw.init();
+    defer glfw.terminate();
     glfw.windowHintTyped(.context_version_major, gl_major);
     glfw.windowHintTyped(.context_version_minor, gl_minor);
     if (comptime builtin.target.os.tag == .macos) {
@@ -95,6 +96,7 @@ pub fn main() !void {
 
     // Compile vertex shader
     const vertexShaderSource: [:0]const u8 = @embedFile("shaders/triangle.vs");
+    std.debug.print("{d}\n", .{vertexShaderSource.len});
     if (builtin.mode == .Debug)
         std.debug.print(
             "vertexShaderSource: {s}\n",
@@ -178,6 +180,7 @@ pub fn main() !void {
 
     // Create shader program
     const shaderProgram: gl.Uint = gl.createProgram();
+    defer gl.deleteProgram(shaderProgram);
     gl.attachShader(shaderProgram, vertexShader);
     gl.attachShader(shaderProgram, fragmentShader);
     if (builtin.mode == .Debug)
@@ -223,6 +226,4 @@ pub fn main() !void {
         window.swapBuffers();
         glfw.pollEvents();
     }
-
-    glfw.terminate();
 }
