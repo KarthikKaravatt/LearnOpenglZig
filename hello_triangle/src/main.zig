@@ -1,4 +1,5 @@
 const std = @import("std");
+const print = @import("std").debug.print;
 const builtin = @import("builtin");
 
 const glfw = @import("zglfw");
@@ -23,7 +24,7 @@ fn hasGlError() bool {
     const gl = zopengl.bindings;
     const e = gl.getError();
     if (e != gl.NO_ERROR) {
-        std.debug.print("OpenGL Error: {d}\n", .{e});
+        print("OpenGL Error: {d}\n", .{e});
         return true;
     }
     return false;
@@ -90,18 +91,14 @@ pub fn main() !void {
     gl.enableVertexAttribArray(0);
     gl.enableVertexAttribArray(0);
     if (builtin.mode == .Debug) {
-        std.debug.print("DEBUG\n", .{});
+        print("DEBUG\n", .{});
         if (hasGlError()) return;
     }
 
     // Compile vertex shader
     const vertexShaderSource: [:0]const u8 = @embedFile("shaders/triangle.vs");
-    std.debug.print("{d}\n", .{vertexShaderSource.len});
     if (builtin.mode == .Debug)
-        std.debug.print(
-            "vertexShaderSource: {s}\n",
-            .{vertexShaderSource.ptr},
-        );
+        print("vertexShaderSource: {s}\n", .{vertexShaderSource.ptr});
     const vertexShader: gl.Uint = gl.createShader(gl.VERTEX_SHADER);
     defer gl.deleteShader(vertexShader);
     gl.shaderSource(
@@ -119,7 +116,7 @@ pub fn main() !void {
             var logSize: gl.Int = 0;
             gl.getShaderInfoLog(vertexShader, 512, &logSize, &infoLog);
             const i: usize = @intCast(logSize);
-            std.debug.print(
+            print(
                 "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n{s}\n",
                 .{infoLog[0..i]},
             );
@@ -129,7 +126,7 @@ pub fn main() !void {
             var logSize: gl.Int = 0;
             gl.getShaderInfoLog(vertexShader, 512, &logSize, &infoLog);
             const i: usize = @intCast(logSize);
-            std.debug.print(
+            print(
                 "INFO::SHADER::VERTEX::LINKING_SUCCESS\n{s}\n",
                 .{infoLog[0..i]},
             );
@@ -140,7 +137,7 @@ pub fn main() !void {
     const fragmentShaderSource: [:0]const u8 =
         @embedFile("shaders/triangle.fs");
     if (builtin.mode == .Debug)
-        std.debug.print(
+        print(
             "fragmentShaderSource: {s}\n",
             .{fragmentShaderSource.ptr},
         );
@@ -161,7 +158,7 @@ pub fn main() !void {
             var logSize: gl.Int = 0;
             gl.getShaderInfoLog(fragmentShader, 512, &logSize, &infoLog);
             const i: usize = @intCast(logSize);
-            std.debug.print(
+            print(
                 "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n{s}\n",
                 .{infoLog[0..i]},
             );
@@ -171,7 +168,7 @@ pub fn main() !void {
             var logSize: gl.Int = 0;
             gl.getShaderInfoLog(vertexShader, 512, &logSize, &infoLog);
             const i: usize = @intCast(logSize);
-            std.debug.print(
+            print(
                 "INFO::SHADER::FRAGMENT::LINKING_SUCCESS\n{s}\n",
                 .{infoLog[0..i]},
             );
@@ -194,14 +191,14 @@ pub fn main() !void {
             var logSize: gl.Int = 0;
             gl.getProgramInfoLog(shaderProgram, 512, &logSize, &infoLog);
             const i: usize = @intCast(logSize);
-            std.debug.print("ERROR::SHADER::PROGRAM::LINKING_FAILED\n{s}\n", .{infoLog[0..i]});
+            print("ERROR::SHADER::PROGRAM::LINKING_FAILED\n{s}\n", .{infoLog[0..i]});
             return;
         } else {
             var infoLog: [512]u8 = undefined;
             var logSize: gl.Int = 0;
             gl.getProgramInfoLog(shaderProgram, 512, &logSize, &infoLog);
             const i: usize = @intCast(logSize);
-            std.debug.print("INFO::SHADER::PROGRAM::LINKING_SUCCESS {d}\n{s}\n", .{ i, infoLog[0..i] });
+            print("INFO::SHADER::PROGRAM::LINKING_SUCCESS {d}\n{s}\n", .{ i, infoLog[0..i] });
         }
     }
     if (builtin.mode == .Debug)
