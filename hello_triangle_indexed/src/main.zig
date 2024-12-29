@@ -1,5 +1,6 @@
 const std = @import("std");
 const print = @import("std").debug.print;
+const panic = std.debug.panic;
 const builtin = @import("builtin");
 
 const glfw = @import("zglfw");
@@ -35,13 +36,16 @@ pub fn main() !void {
     const window_width = 800;
     const window_height = 600;
     const gl_major = 4;
-    const gl_minor = 0;
+    const gl_minor = 6;
 
     //GLFW initialisation
     try glfw.init();
     defer glfw.terminate();
     glfw.windowHintTyped(.context_version_major, gl_major);
     glfw.windowHintTyped(.context_version_minor, gl_minor);
+    if (comptime builtin.mode == .Debug) {
+        glfw.windowHintTyped(.opengl_debug_context, true);
+    }
     if (comptime builtin.target.os.tag == .macos) {
         glfw.windowHintTyped(.opengl_forward_compat, .gl_true);
     } else {
@@ -62,26 +66,57 @@ pub fn main() !void {
     const gl = zopengl.bindings;
 
     // Triangle with 3 points
-    var vertices: [9]gl.Float = [9]gl.Float{
-        -0.7, -0.5, 0.0,
-        0.7,  -0.5, 0.0,
-        0.0,  0.7,  0.0,
+    var vertices: [12]gl.Float = [12]gl.Float{
+        0.5,  0.5,  0.0,
+        0.5,  -0.5, 0.0,
+        -0.5, -0.5, 0.0,
+        -0.5, 0.5,  0.0,
     };
-
-    // Setup vertex array object and vertex buffer object
+    var indices: [6]gl.Uint = [6]gl.Uint{
+        0, 1, 3,
+        1, 2, 3,
+    };
+    // Initialise array object and buffers
     var VAO: gl.Uint = undefined;
-    defer gl.genVertexArrays(1, &VAO);
-    gl.genVertexArrays(1, &VAO);
-    gl.bindVertexArray(VAO);
     var VBO: gl.Uint = undefined;
+    var EBO: gl.Uint = undefined;
+
+    defer gl.deleteVertexArrays(1, &VAO);
     defer gl.deleteBuffers(1, &VBO);
+    defer gl.deleteBuffers(1, &EBO);
+
+    // Generate ids
+    gl.genVertexArrays(1, &VAO);
     gl.genBuffers(1, &VBO);
+    gl.genBuffers(1, &EBO);
+
+    // Bind array and buffers
+    gl.bindVertexArray(VAO);
     gl.bindBuffer(gl.ARRAY_BUFFER, VBO);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, EBO);
+
+    // Add data to the buffer
     gl.bufferData(
         gl.ARRAY_BUFFER,
         vertices.len * @sizeOf(gl.Float),
         &vertices,
         gl.STATIC_DRAW,
+    );
+    gl.bufferData(
+        gl.ELEMENT_ARRAY_BUFFER,
+        indices.len * @sizeOf(gl.Uint),
+        &indices,
+        gl.STATIC_DRAW,
+    );
+
+    // Set the Attribute pointers
+    gl.vertexAttribPointer(
+        0,
+        3,
+        gl.FLOAT,
+        gl.FALSE,
+        3 * @sizeOf(gl.Float),
+        null,
     );
     gl.vertexAttribPointer(
         0,
@@ -91,16 +126,17 @@ pub fn main() !void {
         3 * @sizeOf(gl.Float),
         null,
     );
-    gl.enableVertexAttribArray(0);
-    gl.enableVertexAttribArray(0);
-    if (builtin.mode == .Debug) {
+
+    if (comptime builtin.mode == .Debug) {
         print("DEBUG\n", .{});
-        if (hasGlError()) return;
+        if (hasGlError()) panic("OpenGL buffer stup failed", .{});
     }
+
+    gl.enableVertexAttribArray(0);
 
     // Compile vertex shader
     const vertexShaderSource: [:0]const u8 = @embedFile("shaders/triangle.vs");
-    if (builtin.mode == .Debug)
+    if (comptime builtin.mode == .Debug)
         print("vertexShaderSource: {s}\n", .{vertexShaderSource.ptr});
     const vertexShader: gl.Uint = gl.createShader(gl.VERTEX_SHADER);
     defer gl.deleteShader(vertexShader);
@@ -111,7 +147,7 @@ pub fn main() !void {
         null,
     );
     gl.compileShader(vertexShader);
-    if (builtin.mode == .Debug) {
+    if (comptime builtin.mode == .Debug) {
         var success: gl.Int = 0;
         gl.getShaderiv(vertexShader, gl.COMPILE_STATUS, &success);
         if (success == 0) {
@@ -139,7 +175,7 @@ pub fn main() !void {
     // Compile fragment shader
     const fragmentShaderSource: [:0]const u8 =
         @embedFile("shaders/triangle.fs");
-    if (builtin.mode == .Debug)
+    if (comptime builtin.mode == .Debug)
         print(
             "fragmentShaderSource: {s}\n",
             .{fragmentShaderSource.ptr},
@@ -153,7 +189,7 @@ pub fn main() !void {
         null,
     );
     gl.compileShader(fragmentShader);
-    if (builtin.mode == .Debug) {
+    if (comptime builtin.mode == .Debug) {
         var success: gl.Int = 0;
         gl.getShaderiv(fragmentShader, gl.COMPILE_STATUS, &success);
         if (success == 0) {
@@ -183,10 +219,10 @@ pub fn main() !void {
     defer gl.deleteProgram(shaderProgram);
     gl.attachShader(shaderProgram, vertexShader);
     gl.attachShader(shaderProgram, fragmentShader);
-    if (builtin.mode == .Debug)
+    if (comptime builtin.mode == .Debug)
         if (hasGlError()) return;
     gl.linkProgram(shaderProgram);
-    if (builtin.mode == .Debug) {
+    if (comptime builtin.mode == .Debug) {
         var success: gl.Int = 0;
         gl.getProgramiv(shaderProgram, gl.LINK_STATUS, &success);
         if (success == 0) {
@@ -204,7 +240,7 @@ pub fn main() !void {
             print("INFO::SHADER::PROGRAM::LINKING_SUCCESS {d}\n{s}\n", .{ i, infoLog[0..i] });
         }
     }
-    if (builtin.mode == .Debug)
+    if (comptime builtin.mode == .Debug)
         if (hasGlError()) return;
 
     while (!glfw.Window.shouldClose(window)) {
@@ -214,13 +250,16 @@ pub fn main() !void {
 
         // Draw the triangle
         gl.useProgram(shaderProgram);
-        if (builtin.mode == .Debug)
+        if (comptime builtin.mode == .Debug)
             if (hasGlError()) return;
         gl.bindVertexArray(VAO);
-        if (builtin.mode == .Debug)
+        if (comptime builtin.mode == .Debug)
             if (hasGlError()) return;
-        gl.drawArrays(gl.TRIANGLES, 0, 3);
-        if (builtin.mode == .Debug)
+        gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_INT, null);
+        if (comptime builtin.mode == .Debug)
+            if (hasGlError()) return;
+        gl.bindVertexArray(0);
+        if (comptime builtin.mode == .Debug)
             if (hasGlError()) return;
 
         window.swapBuffers();
