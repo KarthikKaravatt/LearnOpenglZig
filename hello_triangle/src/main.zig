@@ -35,7 +35,7 @@ pub fn main() !void {
     const window_width = 800;
     const window_height = 600;
     const gl_major = 4;
-    const gl_minor = 0;
+    const gl_minor = 6;
 
     //GLFW initialisation
     try glfw.init();
@@ -47,7 +47,6 @@ pub fn main() !void {
     } else {
         glfw.windowHintTyped(.opengl_profile, .opengl_core_profile);
     }
-
     const window = try glfw.Window.create(
         window_width,
         window_height,
@@ -62,20 +61,23 @@ pub fn main() !void {
     const gl = zopengl.bindings;
 
     // Triangle with 3 points
-    var vertices: [9]gl.Float = [9]gl.Float{
-        -0.7, -0.5, 0.0,
-        0.7,  -0.5, 0.0,
-        0.0,  0.7,  0.0,
+    var vertices = [_]gl.Float{
+        -0.5, -0.5, 0.0,
+        0.5,  -0.5, 0.0,
+        0.0,  0.5,  0.0,
     };
 
     // Setup vertex array object and vertex buffer object
     var VAO: gl.Uint = undefined;
-    defer gl.genVertexArrays(1, &VAO);
-    gl.genVertexArrays(1, &VAO);
-    gl.bindVertexArray(VAO);
     var VBO: gl.Uint = undefined;
-    defer gl.deleteBuffers(1, &VBO);
+
+    gl.genVertexArrays(1, &VAO);
     gl.genBuffers(1, &VBO);
+
+    defer gl.deleteVertexArrays(1, &VAO);
+    defer gl.deleteBuffers(1, &VBO);
+
+    gl.bindVertexArray(VAO);
     gl.bindBuffer(gl.ARRAY_BUFFER, VBO);
     gl.bufferData(
         gl.ARRAY_BUFFER,
@@ -89,10 +91,11 @@ pub fn main() !void {
         gl.FLOAT,
         gl.FALSE,
         3 * @sizeOf(gl.Float),
-        null,
+        @ptrFromInt(0),
     );
     gl.enableVertexAttribArray(0);
-    gl.enableVertexAttribArray(0);
+    defer gl.disableVertexAttribArray(0);
+
     if (builtin.mode == .Debug) {
         print("DEBUG\n", .{});
         if (hasGlError()) return;
