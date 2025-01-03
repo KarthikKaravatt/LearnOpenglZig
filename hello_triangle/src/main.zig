@@ -1,7 +1,6 @@
 const std = @import("std");
 const print = @import("std").debug.print;
 const builtin = @import("builtin");
-
 const glfw = @import("zglfw");
 const zopengl = @import("zopengl");
 
@@ -42,6 +41,8 @@ pub fn main() !void {
     defer glfw.terminate();
     glfw.windowHintTyped(.context_version_major, gl_major);
     glfw.windowHintTyped(.context_version_minor, gl_minor);
+    // for tiling window manager
+    glfw.windowHintTyped(.resizable, false);
     if (comptime builtin.target.os.tag == .macos) {
         glfw.windowHintTyped(.opengl_forward_compat, .gl_true);
     } else {
@@ -68,8 +69,9 @@ pub fn main() !void {
     };
 
     // Setup vertex array object and vertex buffer object
-    var VAO: gl.Uint = undefined;
-    var VBO: gl.Uint = undefined;
+    // Set to 0 as it's reserved in opengl (better than undefined)
+    var VAO: gl.Uint = 0;
+    var VBO: gl.Uint = 0;
 
     gl.genVertexArrays(1, &VAO);
     gl.genBuffers(1, &VBO);

@@ -23,11 +23,13 @@ fn processInput(window: *glfw.Window) void {
 }
 /// Check for opengl error
 fn hasGlError() bool {
-    const gl = zopengl.bindings;
-    const e = gl.getError();
-    if (e != gl.NO_ERROR) {
-        print("OpenGL Error: {d}\n", .{e});
-        return true;
+    if (comptime builtin.mode == .Debug) {
+        const gl = zopengl.bindings;
+        const e = gl.getError();
+        if (e != gl.NO_ERROR) {
+            print("OpenGL Error: {d}\n", .{e});
+            return true;
+        }
     }
     return false;
 }
@@ -43,6 +45,7 @@ pub fn main() !void {
     defer glfw.terminate();
     glfw.windowHintTyped(.context_version_major, gl_major);
     glfw.windowHintTyped(.context_version_minor, gl_minor);
+    glfw.windowHintTyped(.resizable, false);
     if (comptime builtin.mode == .Debug) {
         glfw.windowHintTyped(.opengl_debug_context, true);
     }
@@ -64,15 +67,16 @@ pub fn main() !void {
     // Load function pointers for opengl
     try zopengl.loadCoreProfile(glfw.getProcAddress, gl_major, gl_minor);
     const gl = zopengl.bindings;
+    // gl.polygonMode(gl.FRONT_AND_BACK, gl.LINE);
 
-    // Triangle with 3 points
-    var vertices: [12]gl.Float = [12]gl.Float{
+    // Square
+    var vertices = [_]gl.Float{
         0.5,  0.5,  0.0,
         0.5,  -0.5, 0.0,
         -0.5, -0.5, 0.0,
         -0.5, 0.5,  0.0,
     };
-    var indices: [6]gl.Uint = [6]gl.Uint{
+    var indices = [_]gl.Uint{
         0, 1, 3,
         1, 2, 3,
     };
@@ -116,7 +120,7 @@ pub fn main() !void {
         gl.FLOAT,
         gl.FALSE,
         3 * @sizeOf(gl.Float),
-        null,
+        @ptrFromInt(0),
     );
     gl.vertexAttribPointer(
         0,
@@ -124,15 +128,13 @@ pub fn main() !void {
         gl.FLOAT,
         gl.FALSE,
         3 * @sizeOf(gl.Float),
-        null,
+        @ptrFromInt(0),
     );
 
-    if (comptime builtin.mode == .Debug) {
-        print("DEBUG\n", .{});
-        if (hasGlError()) panic("OpenGL buffer stup failed", .{});
-    }
+    if (hasGlError()) panic("OpenGL buffer setup failed", .{});
 
     gl.enableVertexAttribArray(0);
+    defer gl.disableVertexAttribArray(0);
 
     // Compile vertex shader
     const vertexShaderSource: [:0]const u8 = @embedFile("shaders/triangle.vs");
@@ -219,8 +221,7 @@ pub fn main() !void {
     defer gl.deleteProgram(shaderProgram);
     gl.attachShader(shaderProgram, vertexShader);
     gl.attachShader(shaderProgram, fragmentShader);
-    if (comptime builtin.mode == .Debug)
-        if (hasGlError()) return;
+    if (hasGlError()) return;
     gl.linkProgram(shaderProgram);
     if (comptime builtin.mode == .Debug) {
         var success: gl.Int = 0;
@@ -240,8 +241,7 @@ pub fn main() !void {
             print("INFO::SHADER::PROGRAM::LINKING_SUCCESS {d}\n{s}\n", .{ i, infoLog[0..i] });
         }
     }
-    if (comptime builtin.mode == .Debug)
-        if (hasGlError()) return;
+    if (hasGlError()) return;
 
     while (!glfw.Window.shouldClose(window)) {
         processInput(window);
@@ -250,17 +250,13 @@ pub fn main() !void {
 
         // Draw the triangle
         gl.useProgram(shaderProgram);
-        if (comptime builtin.mode == .Debug)
-            if (hasGlError()) return;
+        if (hasGlError()) return;
         gl.bindVertexArray(VAO);
-        if (comptime builtin.mode == .Debug)
-            if (hasGlError()) return;
-        gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_INT, null);
-        if (comptime builtin.mode == .Debug)
-            if (hasGlError()) return;
+        if (hasGlError()) return;
+        gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_INT, @ptrFromInt(0));
+        if (hasGlError()) return;
         gl.bindVertexArray(0);
-        if (comptime builtin.mode == .Debug)
-            if (hasGlError()) return;
+        if (hasGlError()) return;
 
         window.swapBuffers();
         glfw.pollEvents();
