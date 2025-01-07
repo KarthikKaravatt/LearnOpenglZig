@@ -1,6 +1,4 @@
 # Ignore all files by default, but scan all directories
-*
-!*/
 
 !.zigversion
 !.lfs-content-token
@@ -60,6 +58,7 @@
 !/libs/zstbi
 !/libs/ztracy
 !/libs/zwindows
+!.vim
 
 # Ignore some special directories
 *zig-cache
@@ -68,3 +67,4 @@ backup
 
 # Ignore some special system files
 *.DS_Store
+Session.vim
