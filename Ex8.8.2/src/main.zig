@@ -82,49 +82,72 @@ pub fn main() !void {
     _ = window.setFramebufferSizeCallback(frameBufferSizeCallback);
     try zopengl.loadCoreProfile(glfw.getProcAddress, gl_major, gl_minor);
 
-    var vertices = [_]gl.Float{
+    var triangle_1 = [_]gl.Float{
         // Triangle 1 (moved slightly to the left)
         -0.9, -0.5, 0.0, // Bottom left
         0.0, -0.5, 0.0, // Bottom right
         -0.45, 0.5, 0.0, // Top center
-        // Triangle 2 (unchanged)
+    };
+
+    var triangle_2 = [_]gl.Float{
         0, -0.5, 0.0, // Bottom left
         0.9, -0.5, 0.0, // Bottom right
         0.45, 0.5, 0.0, // Top center
     };
 
-    var VAO: gl.Uint = 0;
-    var VBO: gl.Uint = 0;
+    var VAO_T1: gl.Uint = 0;
+    var VAO_T2: gl.Uint = 0;
 
-    gl.genVertexArrays(1, &VAO);
-    defer gl.deleteVertexArrays(1, &VAO);
-    gl.genBuffers(1, &VBO);
-    defer gl.deleteBuffers(1, &VBO);
+    gl.genVertexArrays(1, &VAO_T1);
+    gl.genVertexArrays(1, &VAO_T2);
 
-    gl.bindVertexArray(VAO);
-    gl.bindBuffer(gl.ARRAY_BUFFER, VBO);
+    defer gl.deleteVertexArrays(1, &VAO_T1);
+    defer gl.deleteVertexArrays(1, &VAO_T2);
+    var VBO_T1: gl.Uint = 0;
+    var VBO_T2: gl.Uint = 0;
 
-    const verticesSize = vertices.len * @sizeOf(gl.Float);
+    gl.genBuffers(1, &VBO_T1);
+    gl.genBuffers(1, &VBO_T2);
+    defer gl.deleteBuffers(1, &VBO_T1);
+    defer gl.deleteBuffers(1, &VBO_T2);
+
+    gl.bindVertexArray(VAO_T1);
+    gl.bindBuffer(gl.ARRAY_BUFFER, VBO_T1);
     gl.bufferData(
         gl.ARRAY_BUFFER,
-        verticesSize,
-        &vertices,
+        triangle_1.len * @sizeOf(gl.Float),
+        &triangle_1,
         gl.STATIC_DRAW,
     );
-
-    const vertexSize = 3 * @sizeOf(gl.Float);
     gl.vertexAttribPointer(
         0,
         3,
         gl.FLOAT,
         gl.FALSE,
-        vertexSize,
+        3 * @sizeOf(gl.Float),
         @ptrFromInt(0),
     );
     gl.enableVertexAttribArray(0);
-    defer gl.disableVertexAttribArray(0);
-    if (checkGLError()) @panic("Error setting up vertex array and buffer");
 
+    gl.bindVertexArray(VAO_T2);
+    gl.bindBuffer(gl.ARRAY_BUFFER, VBO_T2);
+    gl.bufferData(
+        gl.ARRAY_BUFFER,
+        triangle_2.len * @sizeOf(gl.Float),
+        &triangle_2,
+        gl.STATIC_DRAW,
+    );
+
+    gl.vertexAttribPointer(
+        0,
+        3,
+        gl.FLOAT,
+        gl.FALSE,
+        3 * @sizeOf(gl.Float),
+        @ptrFromInt(0),
+    );
+    gl.enableVertexAttribArray(0);
+    if (checkGLError()) return panic("Buffer setup failed", .{});
     const vertexShaderSource: [:0]const u8 = @embedFile(
         "shaders/triangle.vs",
     );
@@ -186,10 +209,11 @@ pub fn main() !void {
         gl.useProgram(shaderProgram);
         gl.clearColor(0.2, 0.3, 0.3, 1.0);
         gl.clear(gl.COLOR_BUFFER_BIT);
-
         gl.useProgram(shaderProgram);
-        gl.bindVertexArray(VAO);
-        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        gl.bindVertexArray(VAO_T1);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        gl.bindVertexArray(VAO_T2);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
         if (checkGLError()) return panic("Shader program error", .{});
 
         window.swapBuffers();

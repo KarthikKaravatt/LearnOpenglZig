@@ -122,14 +122,6 @@ pub fn main() !void {
         3 * @sizeOf(gl.Float),
         @ptrFromInt(0),
     );
-    gl.vertexAttribPointer(
-        0,
-        3,
-        gl.FLOAT,
-        gl.FALSE,
-        3 * @sizeOf(gl.Float),
-        @ptrFromInt(0),
-    );
 
     if (hasGlError()) panic("OpenGL buffer setup failed", .{});
 
