@@ -1,249 +1,175 @@
+// Imports
 const std = @import("std");
-const print = @import("std").debug.print;
-const panic = std.debug.panic;
 const builtin = @import("builtin");
 
 const glfw = @import("zglfw");
-const zopengl = @import("zopengl");
+const zgl = @import("zopengl");
 
-/// Change the viewport size when window is resized
-fn frameBufferSizeCallback(
-    _: *glfw.Window,
-    width: i32,
-    height: i32,
-) callconv(.c) void {
-    zopengl.bindings.viewport(0, 0, width, height);
-}
+const ShaderConstructor = @import("./shader.zig").ShaderConstructor;
 
-/// Process the input
-fn processInput(window: *glfw.Window) void {
-    if (glfw.Window.getKey(window, glfw.Key.escape) == glfw.Action.press) {
-        glfw.Window.setShouldClose(window, true);
-    }
-}
-/// Check for opengl error
-fn hasGlError() bool {
-    if (comptime builtin.mode == .Debug) {
-        const gl = zopengl.bindings;
-        const e = gl.getError();
-        if (e != gl.NO_ERROR) {
-            print("OpenGL Error: {d}\n", .{e});
-            return true;
+// shorthand
+const gl = zgl.wrapper;
+const bgl = zgl.bindings;
+
+// Functions
+const print = std.debug.print;
+const panic = std.debug.panic;
+
+//Mode
+const isDebug = builtin.mode == .Debug;
+
+//constants
+const gl_major = 4;
+const gl_minor = 6;
+const triangleVertexShaderPath = "src/shaders/triangle.vs";
+const triangleFragmentShaderPath = "src/shaders/triangle.fs";
+
+pub fn main() void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}).init;
+    const allocator = gpa.allocator();
+    defer {
+        const deint_status = gpa.deinit();
+        if (deint_status == .leak) {
+            std.testing.expect(false) catch {
+                panic("Memory Leak detected", .{});
+            };
         }
     }
-    return false;
-}
+    const bytes = allocator.alloc(u8, 100) catch |err| {
+        panic("Allocation failed {any}", .{err});
+    };
+    defer allocator.free(bytes);
 
-pub fn main() !void {
-    const window_width = 800;
-    const window_height = 600;
-    const gl_major = 4;
-    const gl_minor = 6;
-
-    //GLFW initialisation
-    try glfw.init();
+    glfw.init() catch |err| {
+        panic("Failed to intialise glfw: {any}", .{err});
+    };
     defer glfw.terminate();
-    glfw.windowHintTyped(.context_version_major, gl_major);
-    glfw.windowHintTyped(.context_version_minor, gl_minor);
-    glfw.windowHintTyped(.resizable, false);
-    if (comptime builtin.mode == .Debug) {
-        glfw.windowHintTyped(.opengl_debug_context, true);
-    }
-    if (comptime builtin.target.os.tag == .macos) {
-        glfw.windowHintTyped(.opengl_forward_compat, .gl_true);
-    } else {
-        glfw.windowHintTyped(.opengl_profile, .opengl_core_profile);
-    }
 
-    const window = try glfw.Window.create(
-        window_width,
-        window_height,
-        "LearnOpenGL",
-        null,
-    );
-    glfw.makeContextCurrent(window);
-    _ = window.setFramebufferSizeCallback(frameBufferSizeCallback);
+    const window = glfwSetupWindow("CrateTexture");
 
-    // Load function pointers for opengl
-    try zopengl.loadCoreProfile(glfw.getProcAddress, gl_major, gl_minor);
-    const gl = zopengl.bindings;
-    // gl.polygonMode(gl.FRONT_AND_BACK, gl.LINE);
-
-    // Square
-    var vertices = [_]gl.Float{
+    zgl.loadCoreProfile(glfw.getProcAddress, gl_major, gl_minor) catch |err| {
+        panic("Failed to load opengl core profile: {any}", .{err});
+    };
+    var vertices = [_]f32{
         // pos           //colors
         -0.5, -0.5, 0.0, 1.0, 0.0, 0.0,
         0.5,  -0.5, 0.0, 0.0, 1.0, 0.0,
         0.0,  0.5,  0.0, 0.0, 0.0, 1.0,
     };
-    // Initialise array object and buffers
-    var VAO: gl.Uint = undefined;
-    var VBO: gl.Uint = undefined;
 
-    defer gl.deleteVertexArrays(1, &VAO);
-    defer gl.deleteBuffers(1, &VBO);
+    const vertex_data_size = @sizeOf(@TypeOf(vertices));
+    // Opengl works with raw bytes
+    const byte_ptr: ?[*]const u8 = @ptrCast(&vertices);
 
-    // Generate ids
-    gl.genVertexArrays(1, &VAO);
-    gl.genBuffers(1, &VBO);
+    var vao: gl.VertexArrayObject = undefined;
+    var vbo: gl.Buffer = undefined;
+    defer gl.deleteVertexArray(&vao);
+    defer gl.deleteBuffer(&vbo);
 
-    // Bind array and buffers
-    gl.bindVertexArray(VAO);
-    gl.bindBuffer(gl.ARRAY_BUFFER, VBO);
+    gl.genVertexArray(&vao);
+    gl.genBuffer(&vbo);
 
-    // Add data to the buffer
+    gl.bindVertexArray(vao);
+    gl.bindBuffer(.array_buffer, vbo);
+
     gl.bufferData(
-        gl.ARRAY_BUFFER,
-        vertices.len * @sizeOf(gl.Float),
-        &vertices,
-        gl.STATIC_DRAW,
+        .array_buffer,
+        vertex_data_size,
+        byte_ptr,
+        .static_draw,
     );
-
-    // Set the Attribute pointers
+    const vertexCoordLocation: gl.VertexAttribLocation = .{ .location = 0 };
+    const vertexColourLocation: gl.VertexAttribLocation = .{ .location = 1 };
     gl.vertexAttribPointer(
+        vertexCoordLocation,
+        3,
+        .float,
+        gl.FALSE,
+        6 * @sizeOf(gl.Float),
         0,
-        3,
-        gl.FLOAT,
-        gl.FALSE,
-        6 * @sizeOf(gl.Float),
-        @ptrFromInt(0),
     );
-    gl.enableVertexAttribArray(0);
+    gl.enableVertexAttribArray(vertexCoordLocation);
     gl.vertexAttribPointer(
-        1,
+        vertexColourLocation,
         3,
-        gl.FLOAT,
+        .float,
         gl.FALSE,
         6 * @sizeOf(gl.Float),
-        @ptrFromInt(3 * @sizeOf(gl.Float)),
+        3 * @sizeOf((gl.Float)),
     );
-    gl.enableVertexAttribArray(1);
-
-    if (hasGlError()) panic("OpenGL buffer setup failed", .{});
-
-    // Compile vertex shader
-    const vertexShaderSource: [:0]const u8 = @embedFile("shaders/triangle.vs");
-    if (comptime builtin.mode == .Debug)
-        print("vertexShaderSource: {s}\n", .{vertexShaderSource.ptr});
-    const vertexShader: gl.Uint = gl.createShader(gl.VERTEX_SHADER);
-    defer gl.deleteShader(vertexShader);
-    gl.shaderSource(
-        vertexShader,
-        1,
-        &[_][*c]const u8{vertexShaderSource.ptr},
-        null,
+    gl.enableVertexAttribArray(vertexColourLocation);
+    const shader: ShaderConstructor = ShaderConstructor.init(
+        triangleVertexShaderPath,
+        triangleFragmentShaderPath,
+        allocator,
     );
-    gl.compileShader(vertexShader);
-    if (comptime builtin.mode == .Debug) {
-        var success: gl.Int = 0;
-        gl.getShaderiv(vertexShader, gl.COMPILE_STATUS, &success);
-        if (success == 0) {
-            var infoLog: [512]u8 = undefined;
-            var logSize: gl.Int = 0;
-            gl.getShaderInfoLog(vertexShader, 512, &logSize, &infoLog);
-            const i: usize = @intCast(logSize);
-            print(
-                "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n{s}\n",
-                .{infoLog[0..i]},
-            );
-            return;
-        } else {
-            var infoLog: [512]u8 = undefined;
-            var logSize: gl.Int = 0;
-            gl.getShaderInfoLog(vertexShader, 512, &logSize, &infoLog);
-            const i: usize = @intCast(logSize);
-            print(
-                "INFO::SHADER::VERTEX::LINKING_SUCCESS\n{s}\n",
-                .{infoLog[0..i]},
-            );
-        }
-    }
-
-    // Compile fragment shader
-    const fragmentShaderSource: [:0]const u8 =
-        @embedFile("shaders/triangle.fs");
-    if (comptime builtin.mode == .Debug)
-        print(
-            "fragmentShaderSource: {s}\n",
-            .{fragmentShaderSource.ptr},
-        );
-    const fragmentShader: gl.Uint = gl.createShader(gl.FRAGMENT_SHADER);
-    defer gl.deleteShader(fragmentShader);
-    gl.shaderSource(
-        fragmentShader,
-        1,
-        &[_][*c]const u8{fragmentShaderSource.ptr},
-        null,
-    );
-    gl.compileShader(fragmentShader);
-    if (comptime builtin.mode == .Debug) {
-        var success: gl.Int = 0;
-        gl.getShaderiv(fragmentShader, gl.COMPILE_STATUS, &success);
-        if (success == 0) {
-            var infoLog: [512]u8 = undefined;
-            var logSize: gl.Int = 0;
-            gl.getShaderInfoLog(fragmentShader, 512, &logSize, &infoLog);
-            const i: usize = @intCast(logSize);
-            print(
-                "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n{s}\n",
-                .{infoLog[0..i]},
-            );
-            return;
-        } else {
-            var infoLog: [512]u8 = undefined;
-            var logSize: gl.Int = 0;
-            gl.getShaderInfoLog(vertexShader, 512, &logSize, &infoLog);
-            const i: usize = @intCast(logSize);
-            print(
-                "INFO::SHADER::FRAGMENT::LINKING_SUCCESS\n{s}\n",
-                .{infoLog[0..i]},
-            );
-        }
-    }
-
-    // Create shader program
-    const shaderProgram: gl.Uint = gl.createProgram();
-    defer gl.deleteProgram(shaderProgram);
-    gl.attachShader(shaderProgram, vertexShader);
-    gl.attachShader(shaderProgram, fragmentShader);
+    defer shader.deinit();
+    shader.use();
     if (hasGlError()) return;
-    gl.linkProgram(shaderProgram);
-    if (comptime builtin.mode == .Debug) {
-        var success: gl.Int = 0;
-        gl.getProgramiv(shaderProgram, gl.LINK_STATUS, &success);
-        if (success == 0) {
-            var infoLog: [512]u8 = undefined;
-            var logSize: gl.Int = 0;
-            gl.getProgramInfoLog(shaderProgram, 512, &logSize, &infoLog);
-            const i: usize = @intCast(logSize);
-            print("ERROR::SHADER::PROGRAM::LINKING_FAILED\n{s}\n", .{infoLog[0..i]});
-            return;
-        } else {
-            var infoLog: [512]u8 = undefined;
-            var logSize: gl.Int = 0;
-            gl.getProgramInfoLog(shaderProgram, 512, &logSize, &infoLog);
-            const i: usize = @intCast(logSize);
-            print("INFO::SHADER::PROGRAM::LINKING_SUCCESS {d}\n{s}\n", .{ i, infoLog[0..i] });
-        }
-    }
-    gl.useProgram(shaderProgram);
-    if (hasGlError()) return;
-
-    while (!glfw.Window.shouldClose(window)) {
+    while (!window.shouldClose()) {
         processInput(window);
         gl.clearColor(0.2, 0.3, 0.3, 1.0);
-        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.clear(.{ .color = true });
+        _ = hasGlError();
 
-        // Draw the triangle
-        if (hasGlError()) return;
-        gl.bindVertexArray(VAO);
-        if (hasGlError()) return;
-        gl.drawArrays(gl.TRIANGLES, 0, 3);
-        if (hasGlError()) return;
-        gl.bindVertexArray(0);
-        if (hasGlError()) return;
+        gl.bindVertexArray(vao);
+        gl.drawArrays(.triangles, 0, 3);
+        _ = hasGlError();
 
         window.swapBuffers();
         glfw.pollEvents();
+        _ = hasGlError();
+    }
+}
+
+fn glfwSetupWindow(title: [:0]const u8) *glfw.Window {
+    glfw.windowHint(.context_version_major, gl_major);
+    glfw.windowHint(.context_version_minor, gl_minor);
+    glfw.windowHint(.resizable, false);
+    if (isDebug) {
+        glfw.windowHint(.opengl_debug_context, true);
+    }
+    if (builtin.target.os.tag == .macos) {
+        glfw.windowHint(.opengl_forward_compat, true);
+    } else {
+        glfw.windowHint(.opengl_profile, .opengl_core_profile);
+    }
+    const window_width = 800;
+    const window_height = 600;
+    const window = glfw.Window.create(
+        window_width,
+        window_height,
+        title,
+        null,
+    ) catch |err| {
+        panic("Window creation failed: {any}", .{err});
+    };
+    glfw.makeContextCurrent(window);
+    _ = glfw.Window.setFramebufferCallback(window, frameBufferSizeCallback);
+    // _ = window.setFramebufferCallback(frameBufferSizeCallback);
+    return window;
+}
+
+fn hasGlError() bool {
+    if (isDebug) {
+        const e = gl.getError();
+        if (e != gl.Error.no_error) {
+            print("OpenGL Error: {s}\n", .{@tagName(e)});
+            return true;
+        }
+    }
+    return false;
+}
+fn frameBufferSizeCallback(
+    _: *glfw.Window,
+    width: i32,
+    height: i32,
+) callconv(.c) void {
+    gl.viewport(0, 0, @bitCast(width), @bitCast(height));
+}
+
+fn processInput(window: *glfw.Window) void {
+    if (window.getKey(glfw.Key.escape) == glfw.Action.press) {
+        window.setShouldClose(true);
     }
 }
