@@ -61,8 +61,8 @@ pub fn main() void {
     // Opengl works with raw bytes
     const byte_ptr: ?[*]const u8 = @ptrCast(&vertices);
 
-    var vao: gl.VertexArrayObject = undefined;
-    var vbo: gl.Buffer = undefined;
+    var vao: gl.VertexArrayObject = .{ .name = 0 };
+    var vbo: gl.Buffer = .{ .name = 0 };
     defer gl.deleteVertexArray(&vao);
     defer gl.deleteBuffer(&vbo);
 
@@ -145,8 +145,7 @@ fn glfwSetupWindow(title: [:0]const u8) *glfw.Window {
         panic("Window creation failed: {any}", .{err});
     };
     glfw.makeContextCurrent(window);
-    _ = glfw.Window.setFramebufferCallback(window, frameBufferSizeCallback);
-    // _ = window.setFramebufferCallback(frameBufferSizeCallback);
+    _ = window.setFramebufferCallback(frameBufferSizeCallback);
     return window;
 }
 
