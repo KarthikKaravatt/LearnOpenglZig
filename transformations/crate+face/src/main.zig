@@ -50,7 +50,7 @@ pub fn main() void {
         panic("Failed to load opengl core profile: {any}", .{err});
     };
 
-    var vertices = [_]f32{
+    const vertices = [_]f32{
         // pos           //colors       //texture coords
         -0.5, -0.5, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
         0.5,  -0.5, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0,
@@ -59,7 +59,7 @@ pub fn main() void {
 
     const vertex_data_size = @sizeOf(@TypeOf(vertices));
     // Opengl works with raw bytes
-    const byte_ptr: ?[*]const u8 = @ptrCast(&vertices);
+    const byte_ptr: ?[*]const u8 = std.mem.asBytes(&vertices);
 
     var vao: gl.VertexArrayObject = .{ .name = 0 };
     var vbo: gl.Buffer = .{ .name = 0 };
@@ -180,7 +180,7 @@ pub fn main() void {
         gl.activeTexture(.texture_1);
         gl.bindTexture(.texture_2d, texture_2);
         const transformLoc = gl.getUniformLocation(shader.shaderProgram, "transform") orelse panic("Transfrom uniform not found", .{});
-        gl.uniformMatrix4fv(transformLoc, 1, false, @ptrCast(&trans));
+        gl.uniformMatrix4fv(transformLoc, 1, false, &zm.matToArr(trans));
         shader.use();
         gl.bindVertexArray(vao);
         gl.drawArrays(.triangles, 0, 3);
