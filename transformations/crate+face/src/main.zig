@@ -5,7 +5,7 @@ const builtin = @import("builtin");
 const glfw = @import("zglfw");
 const zgl = @import("zopengl");
 const zstbi = @import("zstbi");
-const zm = @import("zmath");
+const zm = @import("zmath").zmath;
 
 const ShaderConstructor = @import("./shader.zig").ShaderConstructor;
 
@@ -161,10 +161,6 @@ pub fn main() void {
         triangle_fragment_shader_path,
         allocator,
     );
-    var trans = zm.identity();
-    trans = zm.mul(trans, zm.rotationZ(math.degreesToRadians(90)));
-    const rotVec = zm.f32x4(0.5, 0.5, 0.5, 0.0);
-    trans = zm.mul(trans, zm.scalingV(rotVec));
     defer shader.deinit();
     if (hasGlError()) return;
     shader.use();
@@ -179,7 +175,12 @@ pub fn main() void {
         gl.bindTexture(.texture_2d, texture_1);
         gl.activeTexture(.texture_1);
         gl.bindTexture(.texture_2d, texture_2);
-        const transformLoc = gl.getUniformLocation(shader.shaderProgram, "transform") orelse panic("Transfrom uniform not found", .{});
+        var trans = zm.identity();
+        const time: f32 = @floatCast((glfw.getTime()));
+        const transVec = zm.f32x4(0.0, 0.1667, 0.0, 0.0);
+        trans = zm.mul(trans, zm.translationV(transVec));
+        trans = zm.mul(trans, zm.rotationZ(math.degreesToRadians(time * 20)));
+        const transformLoc = gl.getUniformLocation(shader.shaderProgram, "transform") orelse panic("transfrom uniform not found", .{});
         gl.uniformMatrix4fv(transformLoc, 1, false, &zm.matToArr(trans));
         shader.use();
         gl.bindVertexArray(vao);

@@ -42,8 +42,8 @@
             .hash = "zstbi-0.10.0-AAAAAL2VBwCAQYZQ7se9iRdJUp_RPJmhGBgfrIcVA1_c",
         },
         .zmath = .{
-            .url = "git+https://github.com/zig-gamedev/zmath#ccf7297ef6c01e21b2d51ad81b5b6ce929e86a00",
-            .hash = "zmath-0.11.0-dev-wjwivZY1AwDO7yxNmZ5HWoU03f9mFBet8LN9-oYc3i29",
+            .url = "git+https://github.com/KarthikKaravatt/zmath#2156d4d5ee57ba4f4e0e7f8d0bd0b55c21d3d0ad",
+            .hash = "zmath-0.11.0-dev-wjwivbA1AwB0Zd8p0tEm_G7hKApV4i2j-8RPAnNBrWu0",
         },
     },
     .paths = .{
