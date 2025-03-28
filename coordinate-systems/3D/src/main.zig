@@ -47,72 +47,75 @@ pub fn main() !void {
     };
 
     const vertices = [_]f32{
-        // pos           //colors       //texture coords
-        -0.5,  -0.25, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
-        0.0,   -0.25, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0,
-        -0.25, 0.25,  0.0, 0.0, 0.0, 1.0, 0.5, 0.0,
-
-        0.0,   -0.25, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
-        0.5,   -0.25, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0,
-        0.25,  0.25,  0.0, 0.0, 0.0, 1.0, 0.5, 0.0,
-
-        -0.25, 0.25,  0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
-        0.25,  0.25,  0.0, 0.0, 1.0, 0.0, 1.0, 1.0,
-        0.0,   0.75,  0.0, 0.0, 0.0, 1.0, 0.5, 0.0,
+        // pos         //texture coords
+        0.5, 0.5, 0.0, 1.0, 1.0, // top right
+        0.5, -0.5, 0.0, 1.0, 0.0, // bottom right
+        -0.5, -0.5, 0.0, 0.0, 0.0, // bottom let
+        -0.5, 0.5, 0.0, 0.0, 1.0, // top let
+    };
+    const indices = [_]u32{
+        0, 1, 3,
+        1, 2, 3,
     };
 
     const vertex_data_size = @sizeOf(@TypeOf(vertices));
     // Opengl works with raw bytes
     const vertices_bytes: []const u8 = std.mem.sliceAsBytes(vertices[0..]);
-    const byte_ptr: ?[*]const u8 = vertices_bytes.ptr;
+    const vertices_byte_ptr: ?[*]const u8 = vertices_bytes.ptr;
+
+    const indices_data_size = @sizeOf(@TypeOf(indices));
+    const indices_bytes: []const u8 = std.mem.sliceAsBytes(indices[0..]);
+    const indices_bytes_ptr: ?[*]const u8 = indices_bytes.ptr;
 
     var vao: gl.VertexArrayObject = .{ .name = 0 };
     var vbo: gl.Buffer = .{ .name = 0 };
+    var ebo: gl.Buffer = .{ .name = 0 };
+
     defer gl.deleteVertexArray(&vao);
     defer gl.deleteBuffer(&vbo);
+    defer gl.deleteBuffer(&ebo);
 
     gl.genVertexArray(&vao);
     gl.genBuffer(&vbo);
+    gl.genBuffer(&ebo);
 
     gl.bindVertexArray(vao);
-    gl.bindBuffer(.array_buffer, vbo);
 
+    gl.bindBuffer(.array_buffer, vbo);
     gl.bufferData(
         .array_buffer,
         vertex_data_size,
-        byte_ptr,
+        vertices_byte_ptr,
+        .static_draw,
+    );
+
+    gl.bindBuffer(.element_array_buffer, ebo);
+    gl.bufferData(
+        .element_array_buffer,
+        indices_data_size,
+        indices_bytes_ptr,
         .static_draw,
     );
 
     const vertexCoordLocation: gl.VertexAttribLocation = .{ .location = 0 };
-    const vertexColourLocation: gl.VertexAttribLocation = .{ .location = 1 };
-    const vertexTextureLocation: gl.VertexAttribLocation = .{ .location = 2 };
+    const vertexTextureLocation: gl.VertexAttribLocation = .{ .location = 1 };
     gl.vertexAttribPointer(
         vertexCoordLocation,
         3,
         .float,
         gl.FALSE,
-        8 * @sizeOf(gl.Float),
+        5 * @sizeOf(gl.Float),
         0,
     );
     gl.enableVertexAttribArray(vertexCoordLocation);
-    gl.vertexAttribPointer(
-        vertexColourLocation,
-        3,
-        .float,
-        gl.FALSE,
-        8 * @sizeOf(gl.Float),
-        3 * @sizeOf((gl.Float)),
-    );
-    gl.enableVertexAttribArray(vertexColourLocation);
 
     gl.vertexAttribPointer(
         vertexTextureLocation,
         2,
         .float,
         gl.FALSE,
-        8 * @sizeOf(gl.Float),
-        6 * @sizeOf(gl.Float),
+        5 * @sizeOf(gl.Float),
+        3 * @sizeOf(gl.Float),
     );
     gl.enableVertexAttribArray(vertexTextureLocation);
 
@@ -166,9 +169,9 @@ pub fn main() !void {
         triangle_fragment_shader_path,
         gpa,
     );
+    shader.use();
     defer shader.deinit();
     if (hasGlError()) return;
-    shader.use();
     shader.setInt("texture1", 0, gpa);
     shader.setInt("texture2", 1, gpa);
     while (!window.shouldClose()) {
@@ -180,20 +183,41 @@ pub fn main() !void {
         gl.bindTexture(.texture_2d, texture_1);
         gl.activeTexture(.texture_1);
         gl.bindTexture(.texture_2d, texture_2);
+        shader.use();
+        var model = zm.identity();
+        var view = zm.identity();
+        var projection = zm.identity();
 
-        var trans = zm.identity();
-        const time: f32 = @floatCast((glfw.getTime()));
-        trans = zm.mul(trans, zm.rotationZ(math.degreesToRadians(time * 10)));
-        const transformLoc = gl.getUniformLocation(
+        model = zm.mul(model, zm.rotationX(math.degreesToRadians(-55.0)));
+        view = zm.mul(view, zm.translation(0.0, 0.0, -3.0));
+        projection = zm.perspectiveFovRhGl(math.degreesToRadians(45.0), 800.0 / 600.0, 0.1, 100.0);
+
+        const modelLoc = gl.getUniformLocation(
             shader.shaderProgram,
-            "transform",
+            "model",
         ) orelse {
             panic("transfrom uniform not found", .{});
         };
+        const viewLoc = gl.getUniformLocation(
+            shader.shaderProgram,
+            "view",
+        ) orelse {
+            panic("view uniform not found", .{});
+        };
+        const porjectionLoc = gl.getUniformLocation(
+            shader.shaderProgram,
+            "projection",
+        ) orelse {
+            panic("projection uniform not found", .{});
+        };
 
-        gl.uniformMatrix4fv(transformLoc, 1, false, &zm.matToArr(trans));
+        gl.uniformMatrix4fv(modelLoc, 1, false, &zm.matToArr(model));
+        gl.uniformMatrix4fv(viewLoc, 1, false, &zm.matToArr(view));
+        gl.uniformMatrix4fv(porjectionLoc, 1, false, &zm.matToArr(projection));
+
         gl.bindVertexArray(vao);
-        gl.drawArrays(.triangles, 0, 9);
+        //TODO: Replace this with wrapper function
+        zgl.bindings.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_INT, @ptrFromInt(0));
 
         if (hasGlError()) return;
         window.swapBuffers();

@@ -48,17 +48,9 @@ pub fn main() !void {
 
     const vertices = [_]f32{
         // pos           //colors       //texture coords
-        -0.5,  -0.25, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
-        0.0,   -0.25, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0,
-        -0.25, 0.25,  0.0, 0.0, 0.0, 1.0, 0.5, 0.0,
-
-        0.0,   -0.25, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
-        0.5,   -0.25, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0,
-        0.25,  0.25,  0.0, 0.0, 0.0, 1.0, 0.5, 0.0,
-
-        -0.25, 0.25,  0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
-        0.25,  0.25,  0.0, 0.0, 1.0, 0.0, 1.0, 1.0,
-        0.0,   0.75,  0.0, 0.0, 0.0, 1.0, 0.5, 0.0,
+        -0.25, -0.25, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
+        0.25,  -0.25, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0,
+        0.0,   0.25,  0.0, 0.0, 0.0, 1.0, 0.5, 0.0,
     };
 
     const vertex_data_size = @sizeOf(@TypeOf(vertices));
@@ -171,8 +163,9 @@ pub fn main() !void {
     shader.use();
     shader.setInt("texture1", 0, gpa);
     shader.setInt("texture2", 1, gpa);
+    var trans = zm.identity();
     while (!window.shouldClose()) {
-        processInput(window);
+        processWindowInput(window);
         gl.clearColor(0.2, 0.3, 0.3, 1.0);
         gl.clear(.{ .color = true });
         if (hasGlError()) return;
@@ -181,19 +174,17 @@ pub fn main() !void {
         gl.activeTexture(.texture_1);
         gl.bindTexture(.texture_2d, texture_2);
 
-        var trans = zm.identity();
-        const time: f32 = @floatCast((glfw.getTime()));
-        trans = zm.mul(trans, zm.rotationZ(math.degreesToRadians(time * 10)));
         const transformLoc = gl.getUniformLocation(
             shader.shaderProgram,
             "transform",
         ) orelse {
             panic("transfrom uniform not found", .{});
         };
+        trans = processMovementInput(trans, window);
 
         gl.uniformMatrix4fv(transformLoc, 1, false, &zm.matToArr(trans));
         gl.bindVertexArray(vao);
-        gl.drawArrays(.triangles, 0, 9);
+        gl.drawArrays(.triangles, 0, 3);
 
         if (hasGlError()) return;
         window.swapBuffers();
@@ -247,8 +238,29 @@ fn hasGlError() bool {
     return false;
 }
 
-fn processInput(window: *glfw.Window) void {
+fn processWindowInput(window: *glfw.Window) void {
     if (window.getKey(glfw.Key.escape) == glfw.Action.press) {
         window.setShouldClose(true);
     }
+}
+
+fn processMovementInput(trans: zm.Mat, window: *glfw.Window) zm.Mat {
+    var movementMat = zm.mul(trans, zm.translation(0, 0, 0));
+    if (window.getKey(glfw.Key.right) == glfw.Action.press) {
+        movementMat = zm.mul(trans, zm.translation(0.01, 0, 0));
+    }
+    if (window.getKey(glfw.Key.left) == glfw.Action.press) {
+        movementMat = zm.mul(trans, zm.translation(-0.01, 0, 0));
+    }
+    if (window.getKey(glfw.Key.up) == glfw.Action.press) {
+        movementMat = zm.mul(trans, zm.translation(0, 0.01, 0));
+    }
+    if (window.getKey(glfw.Key.down) == glfw.Action.press) {
+        movementMat = zm.mul(trans, zm.translation(0, -0.01, 0));
+    }
+    if (window.getKey(glfw.Key.q) == glfw.Action.press) {
+        movementMat = zm.mul(trans, zm.rotationY(math.degreesToRadians(-2)));
+    }
+
+    return movementMat;
 }
