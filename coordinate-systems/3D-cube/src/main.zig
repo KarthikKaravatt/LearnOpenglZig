@@ -45,39 +45,23 @@ pub fn main() !void {
     zgl.loadCoreProfile(glfw.getProcAddress, gl_major, gl_minor) catch |err| {
         panic("Failed to load opengl:{}", .{err});
     };
+    gl.enable(.depth_test);
 
-    const vertices = [_]f32{
-        // pos         //texture coords
-        0.5, 0.5, 0.0, 1.0, 1.0, // top right
-        0.5, -0.5, 0.0, 1.0, 0.0, // bottom right
-        -0.5, -0.5, 0.0, 0.0, 0.0, // bottom let
-        -0.5, 0.5, 0.0, 0.0, 1.0, // top let
-    };
-    const indices = [_]u32{
-        0, 1, 3,
-        1, 2, 3,
-    };
+    const vertices = [_]f32{ -0.5, -0.5, -0.5, 0.0, 0.0, 0.5, -0.5, -0.5, 1.0, 0.0, 0.5, 0.5, -0.5, 1.0, 1.0, 0.5, 0.5, -0.5, 1.0, 1.0, -0.5, 0.5, -0.5, 0.0, 1.0, -0.5, -0.5, -0.5, 0.0, 0.0, -0.5, -0.5, 0.5, 0.0, 0.0, 0.5, -0.5, 0.5, 1.0, 0.0, 0.5, 0.5, 0.5, 1.0, 1.0, 0.5, 0.5, 0.5, 1.0, 1.0, -0.5, 0.5, 0.5, 0.0, 1.0, -0.5, -0.5, 0.5, 0.0, 0.0, -0.5, 0.5, 0.5, 1.0, 0.0, -0.5, 0.5, -0.5, 1.0, 1.0, -0.5, -0.5, -0.5, 0.0, 1.0, -0.5, -0.5, -0.5, 0.0, 1.0, -0.5, -0.5, 0.5, 0.0, 0.0, -0.5, 0.5, 0.5, 1.0, 0.0, 0.5, 0.5, 0.5, 1.0, 0.0, 0.5, 0.5, -0.5, 1.0, 1.0, 0.5, -0.5, -0.5, 0.0, 1.0, 0.5, -0.5, -0.5, 0.0, 1.0, 0.5, -0.5, 0.5, 0.0, 0.0, 0.5, 0.5, 0.5, 1.0, 0.0, -0.5, -0.5, -0.5, 0.0, 1.0, 0.5, -0.5, -0.5, 1.0, 1.0, 0.5, -0.5, 0.5, 1.0, 0.0, 0.5, -0.5, 0.5, 1.0, 0.0, -0.5, -0.5, 0.5, 0.0, 0.0, -0.5, -0.5, -0.5, 0.0, 1.0, -0.5, 0.5, -0.5, 0.0, 1.0, 0.5, 0.5, -0.5, 1.0, 1.0, 0.5, 0.5, 0.5, 1.0, 0.0, 0.5, 0.5, 0.5, 1.0, 0.0, -0.5, 0.5, 0.5, 0.0, 0.0, -0.5, 0.5, -0.5, 0.0, 1.0 };
 
     const vertex_data_size = @sizeOf(@TypeOf(vertices));
     // Opengl works with raw bytes
     const vertices_bytes: []const u8 = std.mem.sliceAsBytes(vertices[0..]);
     const vertices_byte_ptr: ?[*]const u8 = vertices_bytes.ptr;
 
-    const indices_data_size = @sizeOf(@TypeOf(indices));
-    const indices_bytes: []const u8 = std.mem.sliceAsBytes(indices[0..]);
-    const indices_bytes_ptr: ?[*]const u8 = indices_bytes.ptr;
-
     var vao: gl.VertexArrayObject = .{ .name = 0 };
     var vbo: gl.Buffer = .{ .name = 0 };
-    var ebo: gl.Buffer = .{ .name = 0 };
 
     defer gl.deleteVertexArray(&vao);
     defer gl.deleteBuffer(&vbo);
-    defer gl.deleteBuffer(&ebo);
 
     gl.genVertexArray(&vao);
     gl.genBuffer(&vbo);
-    gl.genBuffer(&ebo);
 
     gl.bindVertexArray(vao);
 
@@ -86,14 +70,6 @@ pub fn main() !void {
         .array_buffer,
         vertex_data_size,
         vertices_byte_ptr,
-        .static_draw,
-    );
-
-    gl.bindBuffer(.element_array_buffer, ebo);
-    gl.bufferData(
-        .element_array_buffer,
-        indices_data_size,
-        indices_bytes_ptr,
         .static_draw,
     );
 
@@ -177,7 +153,7 @@ pub fn main() !void {
     while (!window.shouldClose()) {
         processInput(window);
         gl.clearColor(0.2, 0.3, 0.3, 1.0);
-        gl.clear(.{ .color = true });
+        gl.clear(.{ .color = true, .depth = true });
         if (hasGlError()) return;
         gl.activeTexture(.texture_0);
         gl.bindTexture(.texture_2d, texture_1);
@@ -191,6 +167,14 @@ pub fn main() !void {
         model = zm.mul(model, zm.rotationX(math.degreesToRadians(-55.0)));
         view = zm.mul(view, zm.translation(0.0, 0.0, -3.0));
         projection = zm.perspectiveFovRhGl(math.degreesToRadians(45.0), 800.0 / 600.0, 0.1, 100.0);
+
+        const time: f32 = @floatCast(glfw.getTime());
+        const current_angle = std.math.degreesToRadians(50) * time;
+
+        const rotation_axis = zm.f32x4(0.5, 1.0, 0.0, 0.0);
+        const rotation_matrix = zm.matFromAxisAngle(rotation_axis, current_angle);
+
+        model = zm.mul(model, rotation_matrix);
 
         const modelLoc = gl.getUniformLocation(
             shader.shaderProgram,
@@ -216,8 +200,7 @@ pub fn main() !void {
         gl.uniformMatrix4fv(porjectionLoc, 1, false, &zm.matToArr(projection));
 
         gl.bindVertexArray(vao);
-        gl.drawElements(.triangles, 6, .unsigned_int, 0);
-        // zgl.bindings.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_INT, @ptrFromInt(0));
+        gl.drawArrays(.triangles, 0, 36);
 
         if (hasGlError()) return;
         window.swapBuffers();
@@ -247,7 +230,7 @@ fn glfwSetupWindow(title: [:0]const u8) *glfw.Window {
         glfw.windowHint(.opengl_profile, .opengl_core_profile);
     }
     const window_width = 800;
-    const window_height = 700;
+    const window_height = 600;
     const window = glfw.Window.create(
         window_width,
         window_height,

@@ -68,3 +68,4 @@ backup
 # Ignore some special system files
 *.DS_Store
 Session.vim
+coordinate-systems/3D/vgcore.475600
