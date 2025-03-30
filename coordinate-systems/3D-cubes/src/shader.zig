@@ -96,7 +96,7 @@ pub const ShaderConstructor = struct {
         name: []const u8,
         value_ptr: *const [16]f32,
     ) void {
-        var name_buffer: [64]u8 = undefined;
+        var name_buffer = std.mem.zeroes([64]u8);
         const terminated_name = std.fmt.bufPrintZ(&name_buffer, "{s}", .{name}) catch {
             std.debug.print("Error: Uniform name '{s}' too long for buffer.\n", .{name});
             return;
