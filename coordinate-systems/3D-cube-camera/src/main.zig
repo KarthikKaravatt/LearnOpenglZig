@@ -94,19 +94,6 @@ pub fn main() !void {
         -0.5, 0.5,  -0.5, 0.0, 1.0,
     };
 
-    const cube_positions = [_]zm.Vec{
-        zm.f32x4(0.0, 0.0, 0.0, 0.0),
-        zm.f32x4(2.0, 5.0, -15.0, 0.0),
-        zm.f32x4(-1.5, -2.2, -2.5, 0.0),
-        zm.f32x4(-3.8, -2.0, -12.3, 0.0),
-        zm.f32x4(2.4, -0.4, -3.5, 0.0),
-        zm.f32x4(-1.7, 3.0, -7.5, 0.0),
-        zm.f32x4(1.3, -2.0, -2.5, 0.0),
-        zm.f32x4(1.5, 2.0, -2.5, 0.0),
-        zm.f32x4(1.5, 0.2, -1.5, 0.0),
-        zm.f32x4(-1.3, 1.0, -1.5, 0.0),
-    };
-
     const vertex_data_size = @sizeOf(@TypeOf(vertices));
     // Opengl works with raw bytes
     const vertices_bytes: []const u8 = std.mem.sliceAsBytes(vertices[0..]);
@@ -208,8 +195,9 @@ pub fn main() !void {
     if (hasGlError()) return;
     shader.setInt("texture1", 0, gpa);
     shader.setInt("texture2", 1, gpa);
+    var movement_vec = zm.f32x4(0, 0, 0, 0);
     while (!window.shouldClose()) {
-        processInput(window);
+        movement_vec = processInput(window, movement_vec);
         gl.clearColor(0.2, 0.3, 0.3, 1.0);
         gl.clear(.{ .color = true, .depth = true });
         if (hasGlError()) return;
@@ -221,7 +209,7 @@ pub fn main() !void {
         var view = zm.identity();
         var projection = zm.identity();
 
-        view = zm.mul(view, zm.translation(0.0, 0.0, -3.0));
+        view = zm.mul(view, zm.translationV(movement_vec));
         projection = zm.perspectiveFovRhGl(math.degreesToRadians(45.0), 800.0 / 600.0, 0.1, 100.0);
 
         const viewLoc = gl.getUniformLocation(
@@ -242,18 +230,15 @@ pub fn main() !void {
 
         var model = zm.identity();
         gl.bindVertexArray(vao);
-        for (0..10) |i| {
-            const time: f32 = @floatCast(glfw.getTime());
-            const current_angle = std.math.degreesToRadians(50) * (time * 0.2);
-
-            const rotation_axis = zm.f32x4(0.5, 1.0, 0.0, 0.0);
-            const rotation_matrix = zm.matFromAxisAngle(rotation_axis, current_angle);
-
-            model = zm.mul(model, zm.translationV(cube_positions[i]));
-            model = zm.mul(model, rotation_matrix);
-            shader.setMat4("model", &zm.matToArr(model));
-            gl.drawArrays(.triangles, 0, 36);
-        }
+        const time: f32 = @floatCast(glfw.getTime());
+        const current_angle = std.math.degreesToRadians(50) * (time * 0.2);
+        const rotation_axis = zm.f32x4(0.0, 1.0, 0.0, 0.0);
+        const rotation_matrix = zm.matFromAxisAngle(rotation_axis, current_angle);
+        model = zm.mul(model, zm.translationV(zm.f32x4(0, 0, 0, 0)));
+        model = zm.mul(model, rotation_matrix);
+        shader.setMat4("model", &zm.matToArr(model));
+        gl.drawArrays(.triangles, 0, 36);
+        // }
 
         if (hasGlError()) return;
         window.swapBuffers();
@@ -307,8 +292,29 @@ fn hasGlError() bool {
     return false;
 }
 
-fn processInput(window: *glfw.Window) void {
-    if (window.getKey(glfw.Key.escape) == glfw.Action.press) {
+fn processInput(window: *glfw.Window, curr_pos: zm.Vec) zm.Vec {
+    var new_pos = curr_pos;
+    if (window.getKey(.escape) == .press) {
         window.setShouldClose(true);
     }
+    if (window.getKey(.w) == .press) {
+        new_pos[2] += 0.1;
+    }
+    if (window.getKey(.s) == .press) {
+        new_pos[2] -= 0.1;
+    }
+    if (window.getKey(.a) == .press) {
+        new_pos[0] += 0.1;
+    }
+    if (window.getKey(.d) == .press) {
+        new_pos[0] -= 0.1;
+    }
+    if (window.getKey(.q) == .press) {
+        new_pos[1] -= 0.1;
+    }
+    if (window.getKey(.e) == .press) {
+        new_pos[1] += 0.1;
+    }
+
+    return new_pos;
 }
