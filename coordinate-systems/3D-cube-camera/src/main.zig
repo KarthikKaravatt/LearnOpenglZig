@@ -94,6 +94,19 @@ pub fn main() !void {
         -0.5, 0.5,  -0.5, 0.0, 1.0,
     };
 
+    const cube_positions = [_]zm.Vec{
+        zm.f32x4(0.0, 0.0, 0.0, 0.0),
+        zm.f32x4(2.0, 5.0, -15.0, 0.0),
+        zm.f32x4(-1.5, -2.2, -2.5, 0.0),
+        zm.f32x4(-3.8, -2.0, -12.3, 0.0),
+        zm.f32x4(2.4, -0.4, -3.5, 0.0),
+        zm.f32x4(-1.7, 3.0, -7.5, 0.0),
+        zm.f32x4(1.3, -2.0, -2.5, 0.0),
+        zm.f32x4(1.5, 2.0, -2.5, 0.0),
+        zm.f32x4(1.5, 0.2, -1.5, 0.0),
+        zm.f32x4(-1.3, 1.0, -1.5, 0.0),
+    };
+
     const vertex_data_size = @sizeOf(@TypeOf(vertices));
     // Opengl works with raw bytes
     const vertices_bytes: []const u8 = std.mem.sliceAsBytes(vertices[0..]);
@@ -198,9 +211,19 @@ pub fn main() !void {
     const movement_vec = zm.f32x4(0, 0, 0, 0);
     var view = zm.identity();
     var time_last = glfw.getTime();
+    var time_last_fps = glfw.getTime();
+    var fps: f32 = 0.0;
+    var frameCount: f32 = 0.0;
     while (!window.shouldClose()) {
+        frameCount += 1;
         const time_now = glfw.getTime();
         const delta_time = time_now - time_last;
+        if (time_now - time_last_fps >= 1.0) {
+            fps = frameCount;
+            frameCount = 0;
+            time_last_fps = time_now;
+            print("FPS: {d} \n", .{fps});
+        }
         time_last = time_now;
         view = processInput(window, movement_vec, view, @floatCast(delta_time));
         gl.clearColor(0.2, 0.3, 0.3, 1.0);
@@ -238,9 +261,14 @@ pub fn main() !void {
         const current_angle = std.math.degreesToRadians(50) * (time * 0.2);
         const rotation_axis = zm.f32x4(0.0, 1.0, 0.0, 0.0);
         const rotation_matrix = zm.matFromAxisAngle(rotation_axis, current_angle);
-        model = zm.mul(model, zm.translationV(zm.f32x4(0, 0, 0, 0)));
+
         model = zm.mul(model, rotation_matrix);
-        shader.setMat4("model", &zm.matToArr(model));
+        for (0..10) |i| {
+            model = zm.mul(model, zm.translationV(cube_positions[i]));
+            shader.setMat4("model", &zm.matToArr(model));
+            gl.drawArrays(.triangles, 0, 36);
+        }
+
         gl.drawArrays(.triangles, 0, 36);
         // }
 
@@ -282,6 +310,7 @@ fn glfwSetupWindow(title: [:0]const u8) *glfw.Window {
         panic("Window creation failed: {any}", .{err});
     };
     glfw.makeContextCurrent(window);
+    glfw.swapInterval(0);
     _ = window.setFramebufferSizeCallback(frameBufferSizeCallback);
     return window;
 }
