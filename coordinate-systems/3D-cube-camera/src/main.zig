@@ -296,61 +296,66 @@ fn hasGlError() bool {
     return false;
 }
 
-fn processInput(window: *glfw.Window, curr_pos: zm.Vec, cur_view: zm.Mat, delta_time: f32) zm.Mat {
-    var move_pos = zm.f32x4(0, 0, 0, 0);
-    var rotation_pos = zm.f32x4(0, 0, 0, 0);
+pub fn processInput(window: *glfw.Window, curr_pos: zm.Vec, cur_view: zm.Mat, delta_time: f32) zm.Mat {
+    var translation_vector = zm.f32x4(0, 0, 0, 0);
+    var rotation_angles = zm.f32x4(0, 0, 0, 0);
     var new_view = cur_view;
     const movement_speed = 2;
     const rotation_speed = 60;
+
     if (window.getKey(.escape) == .press) {
         window.setShouldClose(true);
-    }
-    if (window.getKey(.w) == .press) {
-        move_pos[2] += movement_speed;
-    }
-    if (window.getKey(.s) == .press) {
-        move_pos[2] -= movement_speed;
-    }
-    if (window.getKey(.a) == .press) {
-        move_pos[0] += movement_speed;
-    }
-    if (window.getKey(.d) == .press) {
-        move_pos[0] -= movement_speed;
-    }
-    if (window.getKey(.q) == .press) {
-        move_pos[1] -= movement_speed;
-    }
-    if (window.getKey(.e) == .press) {
-        move_pos[1] += movement_speed;
-    }
-    if (window.getKey(.k) == .press) {
-        rotation_pos[0] += math.degreesToRadians(rotation_speed * delta_time);
-    }
-    if (window.getKey(.i) == .press) {
-        rotation_pos[0] -= math.degreesToRadians(rotation_speed * delta_time);
-    }
-    if (window.getKey(.j) == .press) {
-        rotation_pos[1] -= math.degreesToRadians(rotation_speed * delta_time);
-    }
-    if (window.getKey(.l) == .press) {
-        rotation_pos[1] += math.degreesToRadians(rotation_speed * delta_time);
+        return new_view;
     }
 
-    const total_speed = @abs(move_pos[0]) + @abs(move_pos[1]) + @abs(move_pos[2]) + @abs(move_pos[3]);
-    const total_rotation_speed = @abs(rotation_pos[0]) + @abs(rotation_pos[1]);
+    // Handle translation
+    if (window.getKey(.w) == .press) {
+        translation_vector[2] += movement_speed;
+    } else if (window.getKey(.s) == .press) {
+        translation_vector[2] -= movement_speed;
+    }
+
+    if (window.getKey(.a) == .press) {
+        translation_vector[0] += movement_speed;
+    } else if (window.getKey(.d) == .press) {
+        translation_vector[0] -= movement_speed;
+    }
+
+    if (window.getKey(.q) == .press) {
+        translation_vector[1] -= movement_speed;
+    } else if (window.getKey(.e) == .press) {
+        translation_vector[1] += movement_speed;
+    }
+
+    // Handle rotation
+    if (window.getKey(.k) == .press) {
+        rotation_angles[0] += math.degreesToRadians(rotation_speed);
+    } else if (window.getKey(.i) == .press) {
+        rotation_angles[0] -= math.degreesToRadians(rotation_speed);
+    }
+
+    if (window.getKey(.j) == .press) {
+        rotation_angles[1] -= math.degreesToRadians(rotation_speed);
+    } else if (window.getKey(.l) == .press) {
+        rotation_angles[1] += math.degreesToRadians(rotation_speed);
+    }
+
+    // Only update the view if there's any movement or rotation
+    const total_speed = @abs(translation_vector[0]) + @abs(translation_vector[1]) + @abs(translation_vector[2]) + @abs(translation_vector[3]);
+    const total_rotation_speed = @abs(rotation_angles[0]) + @abs(rotation_angles[1]);
 
     if (total_speed != 0 or total_rotation_speed != 0) {
         const final_pos = zm.f32x4(
-            (curr_pos[0] + move_pos[0]) * delta_time,
-            (curr_pos[1] + move_pos[1]) * delta_time,
-            (curr_pos[2] + move_pos[2]) * delta_time,
-            (curr_pos[3] + move_pos[3]) * delta_time,
+            (curr_pos[0] + translation_vector[0]) * delta_time,
+            (curr_pos[1] + translation_vector[1]) * delta_time,
+            (curr_pos[2] + translation_vector[2]) * delta_time,
+            (curr_pos[3] + translation_vector[3]) * delta_time,
         );
-        new_view = zm.mul(new_view, zm.rotationX(rotation_pos[0]));
-        new_view = zm.mul(new_view, zm.rotationY(rotation_pos[1]));
+
+        // Apply transformations:  Rotation then Translation
+        new_view = zm.mul(new_view, zm.rotationX(rotation_angles[0] * delta_time));
+        new_view = zm.mul(new_view, zm.rotationY(rotation_angles[1] * delta_time));
         new_view = zm.mul(new_view, zm.translationV(final_pos));
-    } else {
-        new_view = zm.mul(new_view, zm.translationV(zm.f32x4(0, 0, 0, 0)));
     }
 
     return new_view;
