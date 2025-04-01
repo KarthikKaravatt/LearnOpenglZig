@@ -195,9 +195,14 @@ pub fn main() !void {
     if (hasGlError()) return;
     shader.setInt("texture1", 0, gpa);
     shader.setInt("texture2", 1, gpa);
-    var movement_vec = zm.f32x4(0, 0, 0, 0);
+    const movement_vec = zm.f32x4(0, 0, 0, 0);
+    var view = zm.identity();
+    var time_last = glfw.getTime();
     while (!window.shouldClose()) {
-        movement_vec = processInput(window, movement_vec);
+        const time_now = glfw.getTime();
+        const delta_time = time_now - time_last;
+        time_last = time_now;
+        view = processInput(window, movement_vec, view, @floatCast(delta_time));
         gl.clearColor(0.2, 0.3, 0.3, 1.0);
         gl.clear(.{ .color = true, .depth = true });
         if (hasGlError()) return;
@@ -206,10 +211,9 @@ pub fn main() !void {
         gl.activeTexture(.texture_1);
         gl.bindTexture(.texture_2d, texture_2);
         shader.use();
-        var view = zm.identity();
         var projection = zm.identity();
 
-        view = zm.mul(view, zm.translationV(movement_vec));
+        // view = zm.mul(view, zm.translationV(movement_vec));
         projection = zm.perspectiveFovRhGl(math.degreesToRadians(45.0), 800.0 / 600.0, 0.1, 100.0);
 
         const viewLoc = gl.getUniformLocation(
@@ -292,29 +296,62 @@ fn hasGlError() bool {
     return false;
 }
 
-fn processInput(window: *glfw.Window, curr_pos: zm.Vec) zm.Vec {
-    var new_pos = curr_pos;
+fn processInput(window: *glfw.Window, curr_pos: zm.Vec, cur_view: zm.Mat, delta_time: f32) zm.Mat {
+    var move_pos = zm.f32x4(0, 0, 0, 0);
+    var rotation_pos = zm.f32x4(0, 0, 0, 0);
+    var new_view = cur_view;
+    const movement_speed = 2;
+    const rotation_speed = 60;
     if (window.getKey(.escape) == .press) {
         window.setShouldClose(true);
     }
     if (window.getKey(.w) == .press) {
-        new_pos[2] += 0.1;
+        move_pos[2] += movement_speed;
     }
     if (window.getKey(.s) == .press) {
-        new_pos[2] -= 0.1;
+        move_pos[2] -= movement_speed;
     }
     if (window.getKey(.a) == .press) {
-        new_pos[0] += 0.1;
+        move_pos[0] += movement_speed;
     }
     if (window.getKey(.d) == .press) {
-        new_pos[0] -= 0.1;
+        move_pos[0] -= movement_speed;
     }
     if (window.getKey(.q) == .press) {
-        new_pos[1] -= 0.1;
+        move_pos[1] -= movement_speed;
     }
     if (window.getKey(.e) == .press) {
-        new_pos[1] += 0.1;
+        move_pos[1] += movement_speed;
+    }
+    if (window.getKey(.k) == .press) {
+        rotation_pos[0] += math.degreesToRadians(rotation_speed * delta_time);
+    }
+    if (window.getKey(.i) == .press) {
+        rotation_pos[0] -= math.degreesToRadians(rotation_speed * delta_time);
+    }
+    if (window.getKey(.j) == .press) {
+        rotation_pos[1] -= math.degreesToRadians(rotation_speed * delta_time);
+    }
+    if (window.getKey(.l) == .press) {
+        rotation_pos[1] += math.degreesToRadians(rotation_speed * delta_time);
     }
 
-    return new_pos;
+    const total_speed = @abs(move_pos[0]) + @abs(move_pos[1]) + @abs(move_pos[2]) + @abs(move_pos[3]);
+    const total_rotation_speed = @abs(rotation_pos[0]) + @abs(rotation_pos[1]);
+
+    if (total_speed != 0 or total_rotation_speed != 0) {
+        const final_pos = zm.f32x4(
+            (curr_pos[0] + move_pos[0]) * delta_time,
+            (curr_pos[1] + move_pos[1]) * delta_time,
+            (curr_pos[2] + move_pos[2]) * delta_time,
+            (curr_pos[3] + move_pos[3]) * delta_time,
+        );
+        new_view = zm.mul(new_view, zm.rotationX(rotation_pos[0]));
+        new_view = zm.mul(new_view, zm.rotationY(rotation_pos[1]));
+        new_view = zm.mul(new_view, zm.translationV(final_pos));
+    } else {
+        new_view = zm.mul(new_view, zm.translationV(zm.f32x4(0, 0, 0, 0)));
+    }
+
+    return new_view;
 }
